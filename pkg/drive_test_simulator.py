@@ -3,6 +3,7 @@ Drive test simulator for mobile network measurements.
 Generates measurement points and calculates RSSI using dual-path propagation model.
 """
 
+from typing import List, Dict, Any, Optional, Tuple
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
@@ -10,7 +11,7 @@ import config
 from propagation import calculate_rssi_at_point
 
 
-def generate_measurement_grid(bounds=None, grid_spacing_m=None):
+def generate_measurement_grid(bounds: Optional[Dict[str, float]] = None, grid_spacing_m: Optional[float] = None) -> List[Tuple[float, float]]:
     """
     Generate a grid of measurement points across the geographic area.
 
@@ -57,12 +58,12 @@ def generate_measurement_grid(bounds=None, grid_spacing_m=None):
 
 
 def simulate_drive_test(
-    bts_list,
-    repeater_list,
-    measurement_points=None,
-    add_noise=None,
-    save_to_csv=True
-):
+    bts_list: List[Dict[str, Any]],
+    repeater_list: List[Dict[str, Any]],
+    measurement_points: Optional[List[Tuple[float, float]]] = None,
+    add_noise: Optional[bool] = None,
+    save_to_csv: bool = True
+) -> List[Dict[str, Any]]:
     """
     Simulate drive test measurements across measurement points.
 
@@ -158,7 +159,7 @@ def simulate_drive_test(
     return measurements
 
 
-def save_measurements_to_csv(measurements, filepath=None):
+def save_measurements_to_csv(measurements: List[Dict[str, Any]], filepath: Optional[str] = None) -> None:
     """
     Save measurements to CSV file.
 
@@ -179,7 +180,7 @@ def save_measurements_to_csv(measurements, filepath=None):
     print(f"Saved {len(measurements)} measurements to {filepath}")
 
 
-def load_measurements_from_csv(filepath=None):
+def load_measurements_from_csv(filepath: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Load measurements from CSV file.
 
@@ -196,7 +197,7 @@ def load_measurements_from_csv(filepath=None):
     return df.to_dict('records')
 
 
-def get_rssi_vector_from_measurement(measurement, bts_list):
+def get_rssi_vector_from_measurement(measurement: Dict[str, Any], bts_list: List[Dict[str, Any]]) -> Dict[str, float]:
     """
     Extract RSSI vector for all BTS from a measurement record.
 

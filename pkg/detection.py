@@ -3,6 +3,7 @@ Repeater detection algorithm using statistical anomaly detection.
 Implements z-score based anomaly detection and DBSCAN spatial clustering.
 """
 
+from typing import List, Dict, Any, Optional, Union, Tuple
 import numpy as np
 import pandas as pd
 from sklearn.cluster import DBSCAN
@@ -12,7 +13,7 @@ from propagation import calculate_rssi_at_point
 from drive_test_simulator import get_rssi_vector_from_measurement
 
 
-def build_expected_coverage_map(bts_list, measurement_points, add_noise=False):
+def build_expected_coverage_map(bts_list: List[Dict[str, Any]], measurement_points: List[Union[Dict[str, Any], Tuple[float, float]]], add_noise: bool = False) -> List[Dict[str, Any]]:
     """
     Build expected coverage map without repeaters.
 
@@ -67,7 +68,7 @@ def build_expected_coverage_map(bts_list, measurement_points, add_noise=False):
     return predictions
 
 
-def calculate_residuals(measurements, predictions, bts_list):
+def calculate_residuals(measurements: List[Dict[str, Any]], predictions: List[Dict[str, Any]], bts_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Calculate residuals (actual - predicted RSSI) for all measurements.
 
@@ -106,7 +107,7 @@ def calculate_residuals(measurements, predictions, bts_list):
     return residuals
 
 
-def detect_anomalies_statistical(residuals, bts_list, z_threshold=None):
+def detect_anomalies_statistical(residuals: List[Dict[str, Any]], bts_list: List[Dict[str, Any]], z_threshold: Optional[float] = None) -> List[Dict[str, Any]]:
     """
     Detect anomalies using statistical z-score method.
 
@@ -181,7 +182,7 @@ def detect_anomalies_statistical(residuals, bts_list, z_threshold=None):
     return anomalies
 
 
-def cluster_anomalies_dbscan(anomalies, eps_m=None, min_samples=None):
+def cluster_anomalies_dbscan(anomalies: List[Dict[str, Any]], eps_m: Optional[float] = None, min_samples: Optional[int] = None) -> List[Dict[str, Any]]:
     """
     Cluster anomalous points spatially using DBSCAN.
 
@@ -244,7 +245,7 @@ def cluster_anomalies_dbscan(anomalies, eps_m=None, min_samples=None):
     return cluster_list
 
 
-def localize_repeater_centroid(cluster):
+def localize_repeater_centroid(cluster: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     Estimate repeater location using weighted centroid of anomaly cluster.
 
@@ -285,7 +286,7 @@ def localize_repeater_centroid(cluster):
     }
 
 
-def detect_repeaters(measurements, bts_list):
+def detect_repeaters(measurements: List[Dict[str, Any]], bts_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Main repeater detection pipeline.
 
@@ -355,7 +356,7 @@ def detect_repeaters(measurements, bts_list):
     return detected_repeaters
 
 
-def validate_detection(detected_repeaters, actual_repeaters):
+def validate_detection(detected_repeaters: List[Dict[str, Any]], actual_repeaters: List[Dict[str, Any]]) -> Dict[str, Any]:
     """
     Validate detection results against ground truth.
 

@@ -3,11 +3,12 @@ Signal propagation model using Friis transmission equation.
 Implements path loss calculation, signal combination, and noise modeling.
 """
 
+from typing import List, Dict, Any
 import numpy as np
 from geopy.distance import geodesic
 
 
-def calculate_distance_km(lat1, lon1, lat2, lon2):
+def calculate_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """
     Calculate distance between two geographic coordinates.
 
@@ -21,7 +22,7 @@ def calculate_distance_km(lat1, lon1, lat2, lon2):
     return geodesic((lat1, lon1), (lat2, lon2)).km
 
 
-def friis_path_loss(distance_km, frequency_mhz, tx_gain_dbi=0, rx_gain_dbi=0):
+def friis_path_loss(distance_km: float, frequency_mhz: float, tx_gain_dbi: float = 0, rx_gain_dbi: float = 0) -> float:
     """
     Calculate path loss using Friis transmission equation.
 
@@ -57,8 +58,8 @@ def friis_path_loss(distance_km, frequency_mhz, tx_gain_dbi=0, rx_gain_dbi=0):
     return path_loss
 
 
-def calculate_received_power(tx_power_dbm, distance_km, frequency_mhz,
-                             tx_gain_dbi=0, rx_gain_dbi=0):
+def calculate_received_power(tx_power_dbm: float, distance_km: float, frequency_mhz: float,
+                             tx_gain_dbi: float = 0, rx_gain_dbi: float = 0) -> float:
     """
     Calculate received power using Friis equation.
 
@@ -84,7 +85,7 @@ def calculate_received_power(tx_power_dbm, distance_km, frequency_mhz,
     return received_power
 
 
-def add_log_normal_shadowing(rssi_dbm, sigma_db=8):
+def add_log_normal_shadowing(rssi_dbm: float, sigma_db: float = 8) -> float:
     """
     Add log-normal shadowing to model realistic signal variations.
 
@@ -102,7 +103,7 @@ def add_log_normal_shadowing(rssi_dbm, sigma_db=8):
     return rssi_dbm + noise
 
 
-def combine_signal_paths(power_list_dbm):
+def combine_signal_paths(power_list_dbm: List[float]) -> float:
     """
     Combine multiple signal paths (e.g., direct + repeater paths).
 
@@ -140,26 +141,26 @@ def combine_signal_paths(power_list_dbm):
     return power_combined_dbm
 
 
-def dbm_to_watts(power_dbm):
+def dbm_to_watts(power_dbm: float) -> float:
     """Convert dBm to Watts."""
     return 10 ** ((power_dbm - 30) / 10)
 
 
-def watts_to_dbm(power_watts):
+def watts_to_dbm(power_watts: float) -> float:
     """Convert Watts to dBm."""
     return 10 * np.log10(power_watts * 1000)
 
 
 def calculate_rssi_at_point(
-    point_lat,
-    point_lon,
-    bts_list,
-    repeater_list,
-    frequency_mhz,
-    rx_gain_dbi=0,
-    add_noise=True,
-    sigma_noise=8
-):
+    point_lat: float,
+    point_lon: float,
+    bts_list: List[Dict[str, Any]],
+    repeater_list: List[Dict[str, Any]],
+    frequency_mhz: float,
+    rx_gain_dbi: float = 0,
+    add_noise: bool = True,
+    sigma_noise: float = 8
+) -> Dict[str, float]:
     """
     Calculate RSSI from all BTS at a measurement point.
 

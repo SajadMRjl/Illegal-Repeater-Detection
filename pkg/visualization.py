@@ -3,17 +3,18 @@ Visualization module for wireless repeater detection.
 Creates interactive maps, heatmaps, and analysis plots.
 """
 
+from typing import List, Dict, Any, Optional
 import numpy as np
 import pandas as pd
 import folium
 from folium.plugins import HeatMap
-import plotly.graph_objects as go
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 from geopy.distance import geodesic
 import config
 
 
-def create_base_map(center_lat=None, center_lon=None, zoom=None):
+def create_base_map(center_lat: Optional[float] = None, center_lon: Optional[float] = None, zoom: Optional[int] = None) -> folium.Map:
     """
     Create base Folium map centered on Tehran.
 
@@ -40,7 +41,7 @@ def create_base_map(center_lat=None, center_lon=None, zoom=None):
     return m
 
 
-def add_bts_markers(map_obj, bts_list):
+def add_bts_markers(map_obj: folium.Map, bts_list: List[Dict[str, Any]]) -> None:
     """
     Add BTS markers to map.
 
@@ -79,7 +80,7 @@ def add_bts_markers(map_obj, bts_list):
         ).add_to(map_obj)
 
 
-def add_repeater_markers(map_obj, repeater_list, color='red', label='Actual'):
+def add_repeater_markers(map_obj: folium.Map, repeater_list: List[Dict[str, Any]], color: str = 'red', label: str = 'Actual') -> None:
     """
     Add repeater markers to map.
 
@@ -119,7 +120,7 @@ def add_repeater_markers(map_obj, repeater_list, color='red', label='Actual'):
         ).add_to(map_obj)
 
 
-def add_detection_error_line(map_obj, detected, actual):
+def add_detection_error_line(map_obj: folium.Map, detected: Dict[str, Any], actual: Dict[str, Any]) -> None:
     """
     Add line showing detection error between detected and actual repeater.
 
@@ -145,7 +146,7 @@ def add_detection_error_line(map_obj, detected, actual):
     ).add_to(map_obj)
 
 
-def add_signal_heatmap(map_obj, measurements):
+def add_signal_heatmap(map_obj: folium.Map, measurements: List[Dict[str, Any]]) -> None:
     """
     Add signal strength heatmap to map.
 
@@ -178,7 +179,7 @@ def add_signal_heatmap(map_obj, measurements):
     ).add_to(map_obj)
 
 
-def add_anomaly_overlay(map_obj, anomalies):
+def add_anomaly_overlay(map_obj: folium.Map, anomalies: List[Dict[str, Any]]) -> None:
     """
     Add anomaly points overlay to map.
 
@@ -200,14 +201,14 @@ def add_anomaly_overlay(map_obj, anomalies):
 
 
 def create_main_detection_map(
-    bts_list,
-    actual_repeaters,
-    detected_repeaters,
-    measurements,
-    anomalies=None,
-    validation_metrics=None,
-    filepath=None
-):
+    bts_list: List[Dict[str, Any]],
+    actual_repeaters: List[Dict[str, Any]],
+    detected_repeaters: List[Dict[str, Any]],
+    measurements: List[Dict[str, Any]],
+    anomalies: Optional[List[Dict[str, Any]]] = None,
+    validation_metrics: Optional[Dict[str, Any]] = None,
+    filepath: Optional[str] = None
+) -> folium.Map:
     """
     Create main detection visualization map.
 
@@ -286,7 +287,7 @@ def create_main_detection_map(
     return m
 
 
-def create_comparison_maps(bts_list, measurements, predictions, filepath=None):
+def create_comparison_maps(bts_list: List[Dict[str, Any]], measurements: List[Dict[str, Any]], predictions: List[Dict[str, Any]], filepath: Optional[str] = None) -> str:
     """
     Create side-by-side comparison of actual vs predicted coverage.
 
@@ -392,7 +393,7 @@ def create_comparison_maps(bts_list, measurements, predictions, filepath=None):
     return combined_html
 
 
-def plot_residual_histogram(residuals, bts_list, z_threshold=None):
+def plot_residual_histogram(residuals: List[Dict[str, Any]], bts_list: List[Dict[str, Any]], z_threshold: Optional[float] = None) -> Figure:
     """
     Plot histogram of residuals with z-score threshold.
 
@@ -439,7 +440,7 @@ def plot_residual_histogram(residuals, bts_list, z_threshold=None):
     return plt.gcf()
 
 
-def plot_detection_metrics(validation_metrics):
+def plot_detection_metrics(validation_metrics: Dict[str, Any]) -> Figure:
     """
     Plot detection performance metrics.
 

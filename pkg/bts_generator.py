@@ -3,6 +3,7 @@ Generate synthetic BTS (Base Transceiver Stations) and repeater locations
 for Tehran mobile network simulation.
 """
 
+from typing import List, Dict, Optional, Any
 import numpy as np
 import pandas as pd
 from geopy.distance import geodesic
@@ -10,14 +11,14 @@ import config
 
 
 def generate_bts_stations(
-    num_bts=None,
-    bounds=None,
-    min_separation_km=None,
-    frequency_mhz=None,
-    tx_power_dbm=None,
-    antenna_gain_dbi=None,
-    random_seed=None
-):
+    num_bts: Optional[int] = None,
+    bounds: Optional[Dict[str, float]] = None,
+    min_separation_km: Optional[float] = None,
+    frequency_mhz: Optional[float] = None,
+    tx_power_dbm: Optional[float] = None,
+    antenna_gain_dbi: Optional[float] = None,
+    random_seed: Optional[int] = None
+) -> List[Dict[str, Any]]:
     """
     Generate synthetic BTS stations within geographic bounds.
 
@@ -99,14 +100,14 @@ def generate_bts_stations(
 
 
 def generate_repeaters(
-    bts_list,
-    num_repeaters=None,
-    bounds=None,
-    gain_db=None,
-    min_dist_km=None,
-    max_dist_km=None,
-    random_seed=None
-):
+    bts_list: List[Dict[str, Any]],
+    num_repeaters: Optional[int] = None,
+    bounds: Optional[Dict[str, float]] = None,
+    gain_db: Optional[float] = None,
+    min_dist_km: Optional[float] = None,
+    max_dist_km: Optional[float] = None,
+    random_seed: Optional[int] = None
+) -> List[Dict[str, Any]]:
     """
     Generate unauthorized repeater locations.
 
@@ -198,7 +199,7 @@ def generate_repeaters(
     return repeater_list
 
 
-def save_bts_to_csv(bts_list, filepath=None):
+def save_bts_to_csv(bts_list: List[Dict[str, Any]], filepath: Optional[str] = None) -> None:
     """Save BTS list to CSV file."""
     import os
 
@@ -213,7 +214,7 @@ def save_bts_to_csv(bts_list, filepath=None):
     print(f"Saved {len(bts_list)} BTS to {filepath}")
 
 
-def save_repeaters_to_csv(repeater_list, filepath=None):
+def save_repeaters_to_csv(repeater_list: List[Dict[str, Any]], filepath: Optional[str] = None) -> None:
     """Save repeater list to CSV file."""
     import os
 
@@ -228,7 +229,7 @@ def save_repeaters_to_csv(repeater_list, filepath=None):
     print(f"Saved {len(repeater_list)} repeaters to {filepath}")
 
 
-def load_bts_from_csv(filepath=None):
+def load_bts_from_csv(filepath: Optional[str] = None) -> List[Dict[str, Any]]:
     """Load BTS list from CSV file."""
     if filepath is None:
         filepath = config.OUTPUT_PATHS['bts_csv']
@@ -237,7 +238,7 @@ def load_bts_from_csv(filepath=None):
     return df.to_dict('records')
 
 
-def load_repeaters_from_csv(filepath=None):
+def load_repeaters_from_csv(filepath: Optional[str] = None) -> List[Dict[str, Any]]:
     """Load repeater list from CSV file."""
     if filepath is None:
         filepath = config.OUTPUT_PATHS['repeaters_csv']

@@ -3,7 +3,7 @@ Visualization module for wireless repeater detection.
 Creates interactive maps, heatmaps, and analysis plots.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 import numpy as np
 import folium
 from folium.plugins import HeatMap
@@ -269,43 +269,29 @@ def create_main_detection_map(
     legend_html += '</div>'
     m.get_root().html.add_child(folium.Element(legend_html))
 
-    # Save to file
-    import os
-
-    if filepath is None:
-        filepath = config.OUTPUT_PATHS['main_map_html']
-
-    # Create directory if it doesn't exist
-    dir_path = os.path.dirname(filepath)
-    if dir_path:
-        os.makedirs(dir_path, exist_ok=True)
-
-    m.save(filepath)
-    print(f"Saved main detection map to {filepath}")
-
     return m
 
 
-def create_comparison_maps(bts_list: List[Dict[str, Any]], measurements: List[Dict[str, Any]], predictions: List[Dict[str, Any]], filepath: Optional[str] = None) -> str:
+def create_comparison_maps(bts_list: List[Dict[str, Any]], measurements: List[Dict[str, Any]], predictions: List[Dict[str, Any]]) -> Tuple[folium.Map, folium.Map]:
     """
-    Create side-by-side comparison of actual vs predicted coverage.
+    Create side-by-side comparison of actual vs predicted coverage and display in notebook.
 
     Args:
         bts_list: List of BTS dictionaries
         measurements: List of actual measurements
         predictions: List of predicted measurements
-        filepath: Output HTML file path
 
     Returns:
-        HTML string with side-by-side maps
+        Tuple of (actual_map, predicted_map)
     """
+    from IPython.display import display, HTML
+    
     print("Creating comparison maps...")
 
     # Map 1: Actual measurements (with repeater)
     m1 = create_base_map()
     add_bts_markers(m1, bts_list)
     add_signal_heatmap(m1, measurements)
-    m1_html = m1._repr_html_()
 
     # Map 2: Predicted coverage (no repeater)
     m2 = create_base_map()
@@ -325,71 +311,15 @@ def create_comparison_maps(bts_list: List[Dict[str, Any]], measurements: List[Di
         })
 
     add_signal_heatmap(m2, pred_as_meas)
-    m2_html = m2._repr_html_()
 
-    # Combine into side-by-side HTML
-    combined_html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Coverage Comparison</title>
-        <style>
-            body {{
-                margin: 0;
-                padding: 20px;
-                font-family: Arial, sans-serif;
-            }}
-            .container {{
-                display: flex;
-                gap: 20px;
-            }}
-            .map-container {{
-                flex: 1;
-            }}
-            h3 {{
-                text-align: center;
-                margin-bottom: 10px;
-            }}
-            iframe {{
-                width: 100%;
-                height: 600px;
-                border: 1px solid #ccc;
-            }}
-        </style>
-    </head>
-    <body>
-        <h1 style="text-align: center;">Signal Coverage Comparison</h1>
-        <div class="container">
-            <div class="map-container">
-                <h3>Actual Measurements (with Repeater)</h3>
-                <iframe srcdoc='{m1_html.replace("'", "&#39;")}'></iframe>
-            </div>
-            <div class="map-container">
-                <h3>Predicted Coverage (without Repeater)</h3>
-                <iframe srcdoc='{m2_html.replace("'", "&#39;")}'></iframe>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-
-    # Save to file
-    import os
-
-    if filepath is None:
-        filepath = config.OUTPUT_PATHS['comparison_map_html']
-
-    # Create directory if it doesn't exist
-    dir_path = os.path.dirname(filepath)
-    if dir_path:
-        os.makedirs(dir_path, exist_ok=True)
-
-    with open(filepath, 'w', encoding='utf-8') as f:
-        f.write(combined_html)
-
-    print(f"Saved comparison maps to {filepath}")
-
-    return combined_html
+    # Display maps sequentially with titles
+    display(HTML("<h2 style='text-align: center;'>Signal Coverage Comparison</h2>"))
+    
+    display(HTML("<h3>Actual Measurements (with Repeater)</h3>"))
+    display(m1)
+    
+    display(HTML("<h3>Predicted Coverage (without Repeater)</h3>"))
+    display(m2)
 
 
 def plot_residual_histogram(residuals: List[Dict[str, Any]], bts_list: List[Dict[str, Any]], z_threshold: Optional[float] = None) -> Figure:

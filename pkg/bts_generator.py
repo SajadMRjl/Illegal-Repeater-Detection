@@ -11,13 +11,11 @@ from . import config
 
 
 def generate_bts_stations(
-    num_bts: Optional[int] = None,
     bounds: Optional[Dict[str, float]] = None,
-    min_separation_km: Optional[float] = None,
+    separation_km: Optional[float] = None,
     frequency_mhz: Optional[float] = None,
     tx_power_dbm: Optional[float] = None,
     antenna_gain_dbi: Optional[float] = None,
-    random_seed: Optional[int] = None
 ) -> List[Dict[str, Any]]:
     """
     Generate synthetic BTS stations within geographic bounds.
@@ -26,80 +24,59 @@ def generate_bts_stations(
     overlapping cell coverage.
 
     Args:
-        num_bts: Number of BTS to generate
         bounds: Dictionary with lat_min, lat_max, lon_min, lon_max
-        min_separation_km: Minimum distance between BTS (km)
+        separation_km: distance between BTS (km)
         frequency_mhz: Operating frequency
         tx_power_dbm: Transmit power
         antenna_gain_dbi: Antenna gain
-        random_seed: Random seed for reproducibility
 
     Returns:
         List of BTS dictionaries
     """
     # Use config defaults if not specified
-    if num_bts is None:
-        num_bts = config.BTS_CONFIG['count']
     if bounds is None:
         bounds = config.TEHRAN_BOUNDS
-    if min_separation_km is None:
-        min_separation_km = config.BTS_CONFIG['min_separation_km']
+    if separation_km is None:
+        separation_km = config.BTS_CONFIG['separation_km']
     if frequency_mhz is None:
         frequency_mhz = config.BTS_CONFIG['frequency_mhz']
     if tx_power_dbm is None:
         tx_power_dbm = config.BTS_CONFIG['tx_power_dbm']
     if antenna_gain_dbi is None:
         antenna_gain_dbi = config.BTS_CONFIG['antenna_gain_dbi']
-    if random_seed is None:
-        random_seed = config.RANDOM_SEED
 
-    np.random.seed(random_seed)
+
+    lat_step_deg = separation_km / 111.0  # Vertical spacing in degrees
+    lon_step_deg = (separation_km * np.sin(np.pi / 3)) / 92.0  # Horizontal spacing: √3/2 * R
+    
 
     bts_list = []
-    max_attempts = 1000
+    col_index = 0
 
-    for i in range(num_bts):
-        attempts = 0
-        while attempts < max_attempts:
-            # Generate random location within bounds
-            lat = np.random.uniform(bounds['lat_min'], bounds['lat_max'])
-            lon = np.random.uniform(bounds['lon_min'], bounds['lon_max'])
+    lon_pivot = bounds['lon_min']
+    while lon_pivot < bounds['lon_max']:
+        lat_pivot = bounds['lat_min'] + (lat_step_deg / 2 if col_index % 2 == 1 else 0)
+        
+        while lat_pivot < bounds['lat_max']:
+            power_variation = np.random.uniform(-2, 2)  # ±2 dBm variation
+            gain_variation = np.random.uniform(-1, 1)  # ±1 dBi variation
+            height_variation = np.random.uniform(-5, 10)  # Height variation: -5m to +10m
+            
+            bts = {
+                'id': f'BTS_{len(bts_list)+1:03d}',
+                'lat': lat_pivot,
+                'lon': lon_pivot,
+                'frequency_mhz': frequency_mhz,
+                'tx_power_dbm': tx_power_dbm + power_variation,  # Realistic variation
+                'antenna_gain_dbi': antenna_gain_dbi + gain_variation,  # Realistic variation
+                'antenna_height_m': max(15, config.BTS_CONFIG['antenna_height_m'] + height_variation)  # Min 15m
+            }
+            bts_list.append(bts)
 
-            # Check minimum separation from existing BTS
-            valid_location = True
-            for existing_bts in bts_list:
-                distance = geodesic(
-                    (lat, lon),
-                    (existing_bts['lat'], existing_bts['lon'])
-                ).km
+            lat_pivot += lat_step_deg
 
-                if distance < min_separation_km:
-                    valid_location = False
-                    break
-
-            if valid_location:
-                # Add realistic variation to BTS parameters
-                # Real networks have slight variations in equipment
-                power_variation = np.random.uniform(-2, 2)  # ±2 dBm variation
-                gain_variation = np.random.uniform(-1, 1)  # ±1 dBi variation
-                height_variation = np.random.uniform(-5, 10)  # Height variation: -5m to +10m
-                
-                bts = {
-                    'id': f'BTS_{i+1:03d}',
-                    'lat': lat,
-                    'lon': lon,
-                    'frequency_mhz': frequency_mhz,
-                    'tx_power_dbm': tx_power_dbm + power_variation,  # Realistic variation
-                    'antenna_gain_dbi': antenna_gain_dbi + gain_variation,  # Realistic variation
-                    'antenna_height_m': max(15, config.BTS_CONFIG['antenna_height_m'] + height_variation)  # Min 15m
-                }
-                bts_list.append(bts)
-                break
-
-            attempts += 1
-
-        if attempts >= max_attempts:
-            print(f"Warning: Could not place BTS {i+1} after {max_attempts} attempts")
+        col_index += 1
+        lon_pivot += lon_step_deg
 
     print(f"Generated {len(bts_list)} BTS stations")
     return bts_list
@@ -110,8 +87,6 @@ def generate_repeaters(
     num_repeaters: Optional[int] = None,
     bounds: Optional[Dict[str, float]] = None,
     gain_db: Optional[float] = None,
-    min_dist_km: Optional[float] = None,
-    max_dist_km: Optional[float] = None,
     random_seed: Optional[int] = None
 ) -> List[Dict[str, Any]]:
     """
@@ -125,8 +100,6 @@ def generate_repeaters(
         num_repeaters: Number of repeaters to generate
         bounds: Geographic bounds
         gain_db: Repeater amplifier gain
-        min_dist_km: Minimum distance from serving BTS
-        max_dist_km: Maximum distance from serving BTS
         random_seed: Random seed
 
     Returns:
@@ -139,12 +112,8 @@ def generate_repeaters(
         bounds = config.TEHRAN_BOUNDS
     if gain_db is None:
         gain_db = config.REPEATER_CONFIG['gain_db']
-    if min_dist_km is None:
-        min_dist_km = config.REPEATER_CONFIG['min_distance_from_bts_km']
-    if max_dist_km is None:
-        max_dist_km = config.REPEATER_CONFIG['max_distance_from_bts_km']
     if random_seed is None:
-        random_seed = config.RANDOM_SEED + 1  # Different seed from BTS
+        random_seed = config.RANDOM_SEED
 
     np.random.seed(random_seed)
 
@@ -163,7 +132,7 @@ def generate_repeaters(
         while attempts < max_attempts:
             # Generate random angle and distance
             angle = np.random.uniform(0, 2 * np.pi)
-            distance_km = np.random.uniform(min_dist_km, max_dist_km)
+            distance_km = np.random.uniform(0, 1)
 
             # Calculate approximate lat/lon offset
             # At Tehran's latitude, 1 degree lat ≈ 111 km, 1 degree lon ≈ 92 km
@@ -183,7 +152,7 @@ def generate_repeaters(
                     (serving_bts['lat'], serving_bts['lon'])
                 ).km
 
-                if min_dist_km <= actual_dist <= max_dist_km:
+                if actual_dist <= 1:
                     repeater = {
                         'id': f'REP_{i+1:03d}',
                         'lat': lat,

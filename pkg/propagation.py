@@ -173,34 +173,36 @@ def calculate_rssi_at_point(
         rssi_indirect_paths = []
 
         for repeater in repeater_list:
-            if repeater.get('serving_bts_id') == bts['id']:
-                # Path: BTS -> Repeater
-                dist_bts_to_rep = geodesic((bts['lat'], bts['lon']), (repeater['lat'], repeater['lon'])).km
+            if repeater.get('serving_bts_id') != bts['id']:
+                continue
 
-                rssi_at_repeater = calculate_received_power(
-                    tx_power_dbm=bts['tx_power_dbm'],
-                    distance_km=dist_bts_to_rep,
-                    frequency_mhz=frequency_mhz,
-                    tx_gain_dbi=bts['antenna_gain_dbi'],
-                    rx_gain_dbi=0  # Repeater input
-                )
+            # Path: BTS -> Repeater
+            dist_bts_to_rep = geodesic((bts['lat'], bts['lon']), (repeater['lat'], repeater['lon'])).km
 
-                # Repeater amplifies the signal
-                rssi_repeater_output = rssi_at_repeater + repeater['gain_db']
+            rssi_at_repeater = calculate_received_power(
+                tx_power_dbm=bts['tx_power_dbm'],
+                distance_km=dist_bts_to_rep,
+                frequency_mhz=frequency_mhz,
+                tx_gain_dbi=bts['antenna_gain_dbi'],
+                rx_gain_dbi=0  # Repeater input
+            )
 
-                # Path: Repeater -> Measurement point
-                dist_rep_to_point = geodesic((repeater['lat'], repeater['lon']), (point_lat, point_lon)).km
+            # Repeater amplifies the signal
+            rssi_repeater_output = rssi_at_repeater + repeater['gain_db']
 
-                # Calculate path loss from repeater to point
-                path_loss_rep_to_point = friis_path_loss(
-                    distance_km=dist_rep_to_point,
-                    frequency_mhz=frequency_mhz,
-                    tx_gain_dbi=0,  # Repeater antenna gain (assume 0)
-                    rx_gain_dbi=rx_gain_dbi
-                )
+            # Path: Repeater -> Measurement point
+            dist_rep_to_point = geodesic((repeater['lat'], repeater['lon']), (point_lat, point_lon)).km
 
-                rssi_via_repeater = rssi_repeater_output - path_loss_rep_to_point
-                rssi_indirect_paths.append(rssi_via_repeater)
+            # Calculate path loss from repeater to point
+            path_loss_rep_to_point = friis_path_loss(
+                distance_km=dist_rep_to_point,
+                frequency_mhz=frequency_mhz,
+                tx_gain_dbi=0,  # Repeater antenna gain (assume 0)
+                rx_gain_dbi=rx_gain_dbi
+            )
+
+            rssi_via_repeater = rssi_repeater_output - path_loss_rep_to_point
+            rssi_indirect_paths.append(rssi_via_repeater)
 
         # Combine all paths (direct + indirect) using logarithmic sum
         all_paths = [rssi_direct] + rssi_indirect_paths

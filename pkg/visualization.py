@@ -301,12 +301,16 @@ def create_main_detection_map(
     '''
 
     if validation_metrics:
+        num_det = validation_metrics.get('num_detected', 0)
+        num_act = validation_metrics.get('num_actual', 0)
+        mean_err = validation_metrics.get('mean_error_m', 0)
+        
         legend_html += f'''
         <hr style="margin: 5px 0;">
         <p style="margin: 3px;"><b>Detection Results:</b></p>
         <p style="margin: 3px; font-size: 12px;">
-        Detected: {validation_metrics['num_detected']}/{validation_metrics['num_actual']}<br>
-        Mean Error: {validation_metrics['mean_error_m']:.1f}m
+        Detected: {num_det}/{num_act}<br>
+        Mean Error: {mean_err:.1f}m
         </p>
         '''
 

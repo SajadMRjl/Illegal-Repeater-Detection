@@ -18,11 +18,12 @@ from .bts_generator import (
 )
 
 from .propagation import (
-    friis_path_loss,
+    urban_path_loss,
     calculate_received_power,
     add_log_normal_shadowing,
     combine_signal_paths,
-    calculate_rssi_at_point
+    calculate_rssi_at_point,
+    clamp_rssi
 )
 
 from .drive_test_simulator import (
@@ -55,11 +56,12 @@ __all__ = [
     'load_repeaters_from_csv',
 
     # Propagation
-    'friis_path_loss',
+    'urban_path_loss',
     'calculate_received_power',
     'add_log_normal_shadowing',
     'combine_signal_paths',
     'calculate_rssi_at_point',
+    'clamp_rssi',
 
     # Drive Test
     'generate_measurement_grid',

@@ -104,78 +104,97 @@ def calculate_residuals(measurements: List[Dict[str, Any]], predictions: List[Di
     return residuals
 
 
-def detect_anomalies_statistical(residuals: List[Dict[str, Any]], bts_list: List[Dict[str, Any]], z_threshold: Optional[float] = None) -> List[Dict[str, Any]]:
+def detect_anomalies_statistical(residuals: List[Dict[str, Any]], bts_list: List[Dict[str, Any]], z_threshold: Optional[float] = None, min_residual_db: float = 12.0) -> List[Dict[str, Any]]:
     """
-    Detect anomalies using statistical z-score method.
-
-    Calculates z-score for each residual and flags points with
-    z-score above threshold as anomalous.
+    Detect anomalies using one-sided z-score method.
+    
+    Key insight: Repeaters BOOST signals, creating POSITIVE residuals.
+    We compute baseline noise statistics from ALL residuals, then flag
+    only the unusually POSITIVE ones.
 
     Args:
         residuals: List of residual dictionaries
-        bts_list: List of BTS dictionaries
-        z_threshold: Z-score threshold (default: from config)
+        bts_list: List of BTS dictionaries  
+        z_threshold: Z-score threshold for anomaly (default: from config)
+        min_residual_db: Minimum residual to consider as potential repeater effect
 
     Returns:
-        List of anomaly dictionaries with z-scores
+        List of anomaly dictionaries
     """
     if z_threshold is None:
         z_threshold = config.DETECTION_CONFIG['z_score_threshold']
 
-    print(f"Detecting anomalies using z-score threshold: {z_threshold}")
+    print(f"One-sided z-score detection (threshold: {z_threshold}, min residual: {min_residual_db} dB)")
 
-    # Collect all residuals across all points and BTS
+    # Collect ALL residuals to establish baseline noise distribution
     all_residuals = []
     for res_dict in residuals:
         for bts in bts_list:
-            bts_id = bts['id']
-            residual_key = f'residual_{bts_id}'
+            residual_key = f'residual_{bts["id"]}'
             if residual_key in res_dict:
                 all_residuals.append(res_dict[residual_key])
 
-    # Calculate mean and std of all residuals
-    mean_residual = np.mean(all_residuals)
-    std_residual = np.std(all_residuals)
+    if not all_residuals:
+        print("No residuals found")
+        return []
 
-    print(f"Residual statistics: mean={mean_residual:.2f} dB, std={std_residual:.2f} dB")
+    all_residuals = np.array(all_residuals)
+    
+    # Baseline: noise should be symmetric around 0 with some std
+    # Use median (robust to outliers from repeaters)
+    baseline_median = np.median(all_residuals)
+    
+    # For std, use only the NEGATIVE side of residuals (unaffected by repeaters)
+    # Mirror it to estimate what the noise std would be without repeaters
+    negative_residuals = all_residuals[all_residuals < baseline_median]
+    if len(negative_residuals) > 10:
+        # Estimate std from negative side only (symmetric assumption)
+        deviations = baseline_median - negative_residuals
+        noise_std = np.sqrt(np.mean(deviations ** 2))
+    else:
+        # Fallback to MAD if not enough negative samples
+        noise_std = np.median(np.abs(all_residuals - baseline_median)) * 1.4826
+    
+    noise_std = max(noise_std, 1.0)  # Minimum 1 dB to avoid division issues
+    
+    print(f"Baseline: median={baseline_median:.2f} dB, noise_std={noise_std:.2f} dB")
 
-    # Calculate z-scores and detect anomalies
+    # Detect anomalies: points with unusually HIGH positive residuals
     anomalies = []
 
     for res_dict in residuals:
-        lat = res_dict['lat']
-        lon = res_dict['lon']
-
-        max_z_score = -np.inf
-        anomalous_bts_id = None
-
+        lat, lon = res_dict['lat'], res_dict['lon']
+        
+        best_anomaly = None
+        
         for bts in bts_list:
-            bts_id = bts['id']
-            residual_key = f'residual_{bts_id}'
+            residual_key = f'residual_{bts["id"]}'
+            if residual_key not in res_dict:
+                continue
+                
+            residual = res_dict[residual_key]
+            
+            # Only positive residuals can indicate repeater boost
+            if residual < min_residual_db:
+                continue
+            
+            # One-sided z-score: how many std above baseline?
+            z_score = (residual - baseline_median) / noise_std
+            
+            if z_score > z_threshold:
+                if best_anomaly is None or z_score > best_anomaly['z_score']:
+                    best_anomaly = {
+                        'lat': lat,
+                        'lon': lon,
+                        'z_score': z_score,
+                        'bts_id': bts['id'],
+                        'residual': residual
+                    }
+        
+        if best_anomaly:
+            anomalies.append(best_anomaly)
 
-            if residual_key in res_dict:
-                residual = res_dict[residual_key]
-
-                # Calculate z-score
-                z_score = (residual - mean_residual) / std_residual
-
-                # Track maximum z-score for this point
-                if z_score > max_z_score:
-                    max_z_score = z_score
-                    anomalous_bts_id = bts_id
-
-        # If max z-score exceeds threshold, mark as anomaly
-        if max_z_score > z_threshold:
-            anomaly = {
-                'lat': lat,
-                'lon': lon,
-                'z_score': max_z_score,
-                'bts_id': anomalous_bts_id,
-                'residual': res_dict[f'residual_{anomalous_bts_id}']
-            }
-            anomalies.append(anomaly)
-
-    print(f"Detected {len(anomalies)} anomalous measurement points")
+    print(f"Detected {len(anomalies)} anomalous points")
     return anomalies
 
 

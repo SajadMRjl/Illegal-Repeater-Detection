@@ -13,17 +13,17 @@ TEHRAN_BOUNDS = {
 
 # BTS (Base Transceiver Station) Parameters
 BTS_CONFIG = {
-    'frequency_mhz': 1800,  # LTE Band 3 (1800 MHz) - realistic frequency
-    'tx_power_dbm': 43,  # Typical macro cell transmit power (40-46 dBm)
-    'antenna_gain_dbi': 15,  # BTS antenna gain (reduced for urban model)
-    'antenna_height_m': 30,  # Typical cell tower height (25-50m)
-    'separation_km': 1,  # distance between BTS (1-2 km urban)
+    'frequency_mhz': 1800,  # LTE Band 3 (1800 MHz)
+    'tx_power_dbm': 45,  # Transmit power (reduced for realistic urban range)
+    'antenna_gain_dbi': 15,  # BTS antenna gain (typical sector antenna)
+    'antenna_height_m': 30,  # Typical cell tower height
+    'separation_km': 1,  # Distance between BTS
 }
 
 # Repeater Parameters
 REPEATER_CONFIG = {
     'count': 3,  # Number of unauthorized repeaters
-    'gain_db': 25,  # Amplifier gain (typical consumer repeater: 20-30 dB)
+    'gain_db': 30,  # Amplifier gain (enough to create detectable boost)
 }
 
 # Drive Test Parameters
@@ -35,15 +35,15 @@ DRIVE_TEST_CONFIG = {
 
 # Noise Model Parameters
 NOISE_CONFIG = {
-    'log_normal_sigma_db': 8,  # Standard deviation for log-normal shadowing
+    'log_normal_sigma_db': 4,  # Standard deviation for log-normal shadowing (reduced for cleaner viz)
     'use_noise': True,  # Enable/disable noise for testing
 }
 
 # Detection Algorithm Parameters
 DETECTION_CONFIG = {
-    'z_score_threshold': 2.5,  # Statistical significance threshold
-    'dbscan_eps_m': 500,  # DBSCAN maximum distance (meters)
-    'dbscan_min_samples': 10,  # DBSCAN minimum cluster size
+    'z_score_threshold': 2.5,  # One-sided z-score threshold
+    'dbscan_eps_m': 400,  # DBSCAN clustering radius (meters)
+    'dbscan_min_samples': 3,  # Minimum points per cluster
 }
 
 # Visualization Parameters

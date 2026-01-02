@@ -1,131 +1,98 @@
 """
-Signal propagation model using Friis transmission equation.
-Implements path loss calculation, signal combination, and noise modeling.
+Signal propagation model for wireless network simulation.
+Implements urban path loss, signal combination, and noise modeling.
 """
 
 from typing import List, Dict, Any
 import numpy as np
 from geopy.distance import geodesic
 
+# RSSI limits (applied once at the end, not repeated)
+RSSI_MIN = -110  # Noise floor / sensitivity limit
+RSSI_MAX = -50   # Maximum realistic received signal (very close to tower)
 
-def friis_path_loss(distance_km: float, frequency_mhz: float, tx_gain_dbi: float = 0, rx_gain_dbi: float = 0) -> float:
+
+def clamp_rssi(rssi_dbm: float) -> float:
+    """Clamp RSSI to realistic range. Single source of truth for limits."""
+    return max(RSSI_MIN, min(RSSI_MAX, rssi_dbm))
+
+
+def urban_path_loss(distance_km: float, frequency_mhz: float, hb_m: float = 30.0) -> float:
     """
-    Calculate path loss using Cost-231 Hata model for urban environments.
-
-    This is more realistic than free-space Friis for urban cellular networks.
-    Uses path loss exponent of ~3.5 for urban environments instead of 2.0.
-
+    Calculate path loss using Cost-231 Hata urban model.
+    
+    Full formula: PL = 46.3 + 33.9*log10(f) - 13.82*log10(hb) + (44.9 - 6.55*log10(hb))*log10(d) + Cm
+    
     Args:
-        distance_km: Distance between transmitter and receiver (km)
-        frequency_mhz: Frequency in MHz
-        tx_gain_dbi: Transmit antenna gain in dBi (default: 0)
-        rx_gain_dbi: Receive antenna gain in dBi (default: 0)
-
+        distance_km: Distance in km (minimum 0.01 km = 10m)
+        frequency_mhz: Frequency in MHz (valid: 1500-2000 MHz)
+        hb_m: Base station antenna height in meters (default: 30m)
+    
     Returns:
-        Path loss in dB
+        Path loss in dB (always positive)
     """
-    # Minimum distance to avoid singularity (10 meters)
-    distance_km = max(distance_km, 0.01)
-
-    # Cost-231 Hata model approximation for urban environment
-    # PL = 46.3 + 33.9*log10(f) - 13.82*log10(hb) + (44.9 - 6.55*log10(hb))*log10(d) + C
-    # Simplified version with typical urban parameters:
-    # Uses path loss exponent ~3.5 instead of free-space 2.0
+    distance_km = max(distance_km, 0.01)  # Minimum 10m
+    
+    # Cost-231 Hata model for urban macro cell
+    # With height corrections included
+    log_hb = np.log10(hb_m)
+    log_f = np.log10(frequency_mhz)
+    log_d = np.log10(distance_km)
+    
     path_loss = (
-        35 * np.log10(distance_km) +  # Urban path loss exponent ~3.5
-        20 * np.log10(frequency_mhz) +
-        32.45 -
-        tx_gain_dbi -
-        rx_gain_dbi
+        46.3 +
+        33.9 * log_f -           # Frequency term
+        13.82 * log_hb +         # BTS height correction (reduces loss)
+        (44.9 - 6.55 * log_hb) * log_d +  # Distance term with height factor
+        3.0                      # Metropolitan correction
     )
+    
+    return max(0, path_loss)
 
-    return path_loss
 
-
-def calculate_received_power(tx_power_dbm: float, distance_km: float, frequency_mhz: float,
-                             tx_gain_dbi: float = 0, rx_gain_dbi: float = 0) -> float:
+def calculate_received_power(
+    tx_power_dbm: float,
+    distance_km: float,
+    frequency_mhz: float,
+    tx_gain_dbi: float = 0,
+    rx_gain_dbi: float = 0
+) -> float:
     """
-    Calculate received power using path loss model.
-
-    Formula: Pr(d) = Pt - PL(d)
-
-    Where:
-    - Pt is transmit power in dBm
-    - PL(d) is path loss at distance d
-
-    Args:
-        tx_power_dbm: Transmit power in dBm
-        distance_km: Distance in kilometers
-        frequency_mhz: Frequency in MHz
-        tx_gain_dbi: Transmit antenna gain in dBi
-        rx_gain_dbi: Receive antenna gain in dBi
-
+    Calculate received power (RSSI) at distance.
+    
+    Formula: Pr = Pt + Gt + Gr - PL
+    
     Returns:
-        Received power in dBm (clamped to realistic range)
+        Received power in dBm (NOT clamped - caller decides when to clamp)
     """
-    path_loss = friis_path_loss(distance_km, frequency_mhz, tx_gain_dbi, rx_gain_dbi)
-    received_power = tx_power_dbm - path_loss
-
-    # Clamp to realistic RSSI range: -120 dBm (noise floor) to -30 dBm (very close)
-    received_power = max(-120, min(-30, received_power))
-
+    path_loss = urban_path_loss(distance_km, frequency_mhz)
+    received_power = tx_power_dbm + tx_gain_dbi + rx_gain_dbi - path_loss
     return received_power
 
 
 def add_log_normal_shadowing(rssi_dbm: float, sigma_db: float = 8) -> float:
-    """
-    Add log-normal shadowing to model realistic signal variations.
-
-    Log-normal shadowing models the random variation in received signal
-    due to obstacles, terrain, and atmospheric conditions.
-
-    Args:
-        rssi_dbm: Received signal strength in dBm
-        sigma_db: Standard deviation of shadowing in dB (default: 8 dB for urban)
-
-    Returns:
-        RSSI with shadowing noise in dBm
-    """
+    """Add log-normal shadowing noise (models buildings, terrain)."""
     noise = np.random.normal(0, sigma_db)
     return rssi_dbm + noise
 
 
 def combine_signal_paths(power_list_dbm: List[float]) -> float:
     """
-    Combine multiple signal paths (e.g., direct + repeater paths).
-
-    CRITICAL: Signals must be combined in linear power domain, not dB domain.
-    This function converts dBm to linear power (mW), sums them, and converts
-    back to dBm.
-
-    Formula:
-    P_total_mW = sum(10^(P_i/10) for each P_i in dBm)
-    P_total_dBm = 10 * log10(P_total_mW)
-
-    Args:
-        power_list_dbm: List of received powers in dBm from different paths
-
-    Returns:
-        Combined power in dBm
-
-    Example:
-        Direct path: -70 dBm
-        Repeater path: -65 dBm
-        Combined: 10*log10(10^(-70/10) + 10^(-65/10)) = -63.46 dBm
+    Combine multiple signal paths in linear power domain.
+    
+    Signals add as power (mW), not as dB.
     """
     if not power_list_dbm:
-        return -np.inf  # No signal
-
-    # Convert each dBm value to linear power (mW)
-    power_linear = sum(10 ** (p_dbm / 10) for p_dbm in power_list_dbm)
-
-    # Convert back to dBm
-    if power_linear <= 0:
-        return -np.inf
-
-    power_combined_dbm = 10 * np.log10(power_linear)
-
-    return power_combined_dbm
+        return RSSI_MIN
+    
+    # Filter out very weak signals that don't contribute
+    valid_powers = [p for p in power_list_dbm if p > RSSI_MIN]
+    if not valid_powers:
+        return RSSI_MIN
+    
+    # Convert to linear, sum, convert back
+    power_linear = sum(10 ** (p / 10) for p in valid_powers)
+    return 10 * np.log10(power_linear)
 
 
 def calculate_rssi_at_point(
@@ -140,28 +107,17 @@ def calculate_rssi_at_point(
 ) -> Dict[str, float]:
     """
     Calculate RSSI from all BTS at a measurement point.
-
-    Considers both direct paths from BTS and indirect paths via repeaters.
-    Implements dual-path propagation model.
-
-    Args:
-        point_lat, point_lon: Measurement point coordinates
-        bts_list: List of BTS dictionaries
-        repeater_list: List of repeater dictionaries
-        frequency_mhz: Operating frequency
-        rx_gain_dbi: Receiver antenna gain
-        add_noise: Whether to add log-normal shadowing
-        sigma_noise: Noise standard deviation in dB
-
-    Returns:
-        Dictionary: {bts_id: rssi_dbm} for all BTS
+    
+    Considers direct path + any repeater paths, combines them properly.
+    Clamping happens ONCE at the end.
     """
     rssi_per_bts = {}
 
     for bts in bts_list:
-        # Calculate direct path from BTS to measurement point
+        signal_paths = []
+        
+        # === Direct path: BTS -> Point ===
         dist_direct = geodesic((bts['lat'], bts['lon']), (point_lat, point_lon)).km
-
         rssi_direct = calculate_received_power(
             tx_power_dbm=bts['tx_power_dbm'],
             distance_km=dist_direct,
@@ -169,52 +125,49 @@ def calculate_rssi_at_point(
             tx_gain_dbi=bts['antenna_gain_dbi'],
             rx_gain_dbi=rx_gain_dbi
         )
-
-        # Calculate indirect paths via repeaters serving this BTS
-        rssi_indirect_paths = []
-
+        signal_paths.append(rssi_direct)
+        
+        # === Indirect paths via repeaters ===
         for repeater in repeater_list:
             if repeater.get('serving_bts_id') != bts['id']:
                 continue
-
-            # Path: BTS -> Repeater
-            dist_bts_to_rep = geodesic((bts['lat'], bts['lon']), (repeater['lat'], repeater['lon'])).km
-
+            
+            # Check if point is within repeater coverage range (max 500m)
+            dist_rep_point = geodesic((repeater['lat'], repeater['lon']), (point_lat, point_lon)).km
+            if dist_rep_point > 0.5:  # Repeater only affects points within 500m
+                continue
+            
+            # BTS -> Repeater (repeater's input antenna assumed 0 dBi)
+            dist_bts_rep = geodesic((bts['lat'], bts['lon']), (repeater['lat'], repeater['lon'])).km
             rssi_at_repeater = calculate_received_power(
                 tx_power_dbm=bts['tx_power_dbm'],
-                distance_km=dist_bts_to_rep,
+                distance_km=dist_bts_rep,
                 frequency_mhz=frequency_mhz,
                 tx_gain_dbi=bts['antenna_gain_dbi'],
-                rx_gain_dbi=0  # Repeater input
+                rx_gain_dbi=0  # Repeater input antenna (not mobile device)
             )
-
-            # Repeater amplifies the signal (capped at 30 dBm max output - 1 Watt)
-            rssi_repeater_output = min(30, rssi_at_repeater + repeater['gain_db'])
-
-            # Path: Repeater -> Measurement point
-            dist_rep_to_point = geodesic((repeater['lat'], repeater['lon']), (point_lat, point_lon)).km
-
-            # Calculate path loss from repeater to point
-            path_loss_rep_to_point = friis_path_loss(
-                distance_km=dist_rep_to_point,
+            
+            # Repeater amplifies (with realistic output power limit of 20 dBm = 100mW)
+            repeater_output = min(20, rssi_at_repeater + repeater['gain_db'])
+            
+            # Repeater -> Point (using lower antenna height for repeater)
+            rssi_via_repeater = calculate_received_power(
+                tx_power_dbm=repeater_output,
+                distance_km=dist_rep_point,
                 frequency_mhz=frequency_mhz,
-                tx_gain_dbi=0,  # Repeater antenna gain (assume 0)
+                tx_gain_dbi=0,
                 rx_gain_dbi=rx_gain_dbi
             )
-
-            rssi_via_repeater = rssi_repeater_output - path_loss_rep_to_point
-            rssi_indirect_paths.append(rssi_via_repeater)
-
-        # Combine all paths (direct + indirect) using logarithmic sum
-        all_paths = [rssi_direct] + rssi_indirect_paths
-        rssi_combined = combine_signal_paths(all_paths)
-
-        # Add log-normal shadowing noise
+            signal_paths.append(rssi_via_repeater)
+        
+        # === Combine all paths ===
+        rssi_combined = combine_signal_paths(signal_paths)
+        
+        # === Add noise ===
         if add_noise:
-            rssi_with_noise = add_log_normal_shadowing(rssi_combined, sigma_noise)
-        else:
-            rssi_with_noise = rssi_combined
-
-        rssi_per_bts[bts['id']] = rssi_with_noise
+            rssi_combined = add_log_normal_shadowing(rssi_combined, sigma_noise)
+        
+        # === Single clamp at the end ===
+        rssi_per_bts[bts['id']] = clamp_rssi(rssi_combined)
 
     return rssi_per_bts

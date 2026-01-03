@@ -393,21 +393,3 @@ def validate_detection(detected_repeaters: List[Dict[str, Any]], actual_repeater
     print(f"{'='*60}\n")
 
     return metrics
-
-
-if __name__ == '__main__':
-    from bts_generator import load_bts_from_csv, load_repeaters_from_csv
-    from drive_test_simulator import load_measurements_from_csv
-
-    # Load data
-    print("Loading data...")
-    bts_stations = load_bts_from_csv()
-    actual_repeaters = load_repeaters_from_csv()
-    measurements = load_measurements_from_csv()
-
-    # Run detection
-    detected_repeaters = detect_repeaters(measurements, bts_stations)
-
-    # Validate results
-    if actual_repeaters:
-        metrics = validate_detection(detected_repeaters, actual_repeaters)

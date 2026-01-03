@@ -222,17 +222,3 @@ def load_repeaters_from_csv(filepath: Optional[str] = None) -> List[Dict[str, An
 
     df = pd.read_csv(filepath)
     return df.to_dict('records')
-
-
-if __name__ == '__main__':
-    # Generate and save BTS stations
-    bts_stations = generate_bts_stations()
-    save_bts_to_csv(bts_stations)
-
-    # Generate and save repeaters
-    repeaters = generate_repeaters(bts_stations)
-    save_repeaters_to_csv(repeaters)
-
-    print("\nBTS and repeater generation complete!")
-    print(f"BTS count: {len(bts_stations)}")
-    print(f"Repeater count: {len(repeaters)}")

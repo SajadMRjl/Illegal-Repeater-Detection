@@ -36,7 +36,6 @@ Wireless/
 │   ├── tehran_network_map.html    # Main interactive map
 │   └── detection_comparison.html  # Side-by-side comparison maps
 ├── pkg/                            # Package source code
-│   ├── __init__.py                # Package initialization
 │   ├── config.py                  # Configuration parameters
 │   ├── bts_generator.py           # BTS and repeater generation
 │   ├── propagation.py             # Friis equation implementation
@@ -62,25 +61,7 @@ Wireless/
 
 ## Usage
 
-### Option 1: Run Python Scripts
-
-Generate the entire simulation from command line:
-
-```bash
-# Step 1: Generate BTS and repeaters
-python -m pkg.bts_generator
-
-# Step 2: Simulate drive test
-python -m pkg.drive_test_simulator
-
-# Step 3: Detect repeaters
-python -m pkg.detection
-
-# Step 4: Create visualizations
-python -m pkg.visualization
-```
-
-### Option 2: Use Jupyter Notebooks (Recommended)
+### Recommended: Use Jupyter Notebook
 
 For interactive analysis and visualization:
 
@@ -97,13 +78,44 @@ Or use JupyterLab:
 jupyter lab
 ```
 
+### Alternative: Use as Python Package
+
+The modules can be imported and used programmatically:
+
+```python
+from pkg import bts_generator, drive_test_simulator, detection, visualization
+from pkg import config
+
+# Generate BTS and repeaters
+bts_list = bts_generator.generate_bts_stations()
+repeater_list = bts_generator.generate_repeaters(bts_list)
+bts_generator.save_bts_to_csv(bts_list)
+bts_generator.save_repeaters_to_csv(repeater_list)
+
+# Simulate drive test
+measurements = drive_test_simulator.simulate_drive_test(bts_list, repeater_list)
+
+# Detect repeaters
+predictions = drive_test_simulator.simulate_result_without_repeaters(bts_list, ...)
+residuals = detection.calculate_residuals(measurements, predictions, bts_list)
+anomalies = detection.detect_anomalies_statistical(residuals, bts_list)
+detected_repeaters = detection.cluster_and_localize(anomalies)
+
+# Visualize results
+map_obj = visualization.create_main_detection_map(
+    bts_list, repeater_list, detected_repeaters, measurements
+)
+```
+
 ## How It Works
 
 ### 1. Network Generation
 
-- Generates 5-10 BTS stations within Tehran boundaries
-- Places 1-2 unauthorized repeaters 2-5 km from their serving BTS
+- Generates BTS stations in a hexagonal grid pattern within Tehran boundaries
+- BTS count depends on geographic bounds and separation distance (default: 1 km)
+- Places 3 unauthorized repeaters (configurable) within 0.33-0.66 km of a reference BTS
 - Ensures minimum separation between BTS to avoid overlap
+- Each BTS has realistic parameter variations (power, gain, height)
 
 ### 2. Signal Propagation (Friis Equation)
 
@@ -138,10 +150,10 @@ This correctly models the physics of signal combination.
 
 ### 4. Drive Test Simulation
 
-- Creates grid of measurement points (50m spacing)
+- Creates grid of measurement points (100m spacing, configurable)
 - At each point, calculates RSSI from all BTS
 - Includes both direct and repeater-amplified paths
-- Adds log-normal shadowing noise (σ = 8 dB)
+- Adds log-normal shadowing noise (σ = 4 dB, configurable)
 - Applies receiver sensitivity floor (-110 dBm)
 
 ### 5. Repeater Detection Algorithm
@@ -153,10 +165,10 @@ This correctly models the physics of signal combination.
 **Step 3**: Statistical anomaly detection:
 ```python
 z_score = (residual - mean) / std
-if z_score > 2.5: mark as anomaly
+if z_score > 3.5: mark as anomaly  # Configurable threshold
 ```
 
-**Step 4**: Spatial clustering with DBSCAN (eps=500m, min_samples=10)
+**Step 4**: Spatial clustering with DBSCAN (eps=300m, min_samples=3)
 
 **Step 5**: Localize repeater using weighted centroid of cluster
 
@@ -171,14 +183,20 @@ Compares detected repeater locations with actual planted locations:
 Edit `pkg/config.py` to adjust simulation parameters:
 
 ```python
-# Example: Change number of BTS
-BTS_CONFIG['count'] = 10
+# Example: Change BTS separation (affects BTS count)
+BTS_CONFIG['separation_km'] = 0.8  # Closer spacing = more BTS
+
+# Example: Change number of repeaters
+REPEATER_CONFIG['count'] = 5
 
 # Example: Adjust detection sensitivity
 DETECTION_CONFIG['z_score_threshold'] = 3.0
 
 # Example: Change noise level
 NOISE_CONFIG['log_normal_sigma_db'] = 6
+
+# Example: Change grid spacing for drive test
+DRIVE_TEST_CONFIG['grid_spacing_m'] = 50  # Higher resolution
 ```
 
 ## Output Files
@@ -190,9 +208,7 @@ The simulation generates:
    - `data/repeaters.csv`: Repeater locations and parameters
    - `data/drive_test_measurements.csv`: All measurement data
 
-2. **Visualization Files** (HTML in `output/` directory):
-   - `output/tehran_network_map.html`: Main interactive map
-   - `output/detection_comparison.html`: Side-by-side comparison maps
+2. **Visualization Files**
 
 ## Key Results
 
@@ -211,19 +227,22 @@ The algorithm successfully identifies unauthorized repeaters without requiring:
 If detection fails or has false positives:
 
 1. **No detections**:
-   - Lower `z_score_threshold` (try 2.0)
-   - Verify repeater gain is high enough (60-80 dB)
-   - Check repeater distance from BTS (2-5 km optimal)
+   - Lower `z_score_threshold` (try 2.5 or 3.0)
+   - Verify repeater gain is high enough (default: 60 dB)
+   - Check repeater placement (default: 0.33-0.66 km from reference BTS)
+   - Increase grid density for better coverage
 
 2. **Too many false positives**:
-   - Raise `z_score_threshold` (try 3.0)
-   - Increase `dbscan_min_samples` (try 15)
-   - Reduce noise level for testing
+   - Raise `z_score_threshold` (try 4.0 or higher)
+   - Increase `dbscan_min_samples` (try 5 or 10)
+   - Reduce noise level (`NOISE_CONFIG['log_normal_sigma_db']`)
+   - Increase `dbscan_eps_m` to merge nearby clusters
 
 3. **Low accuracy**:
-   - Decrease grid spacing (try 30m)
-   - Use trilateration instead of centroid
-   - Increase measurement density near anomalies
+   - Decrease grid spacing (try 50m or 30m)
+   - Increase `dbscan_min_samples` for more stable clusters
+   - Adjust `dbscan_eps_m` to better match repeater coverage area
+   - Verify repeater gain settings are realistic
 
 ## References
 

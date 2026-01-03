@@ -344,21 +344,7 @@ def create_comparison_maps(bts_list: List[Dict[str, Any]], measurements: List[Di
     # Map 2: Predicted coverage (no repeater)
     m2 = create_base_map()
     add_bts_markers(m2, bts_list)
-
-    # Convert predictions to measurement format for heatmap
-    pred_as_meas = []
-    for pred in predictions:
-        # Find max predicted RSSI across all BTS
-        rssi_values = [v for k, v in pred.items() if k.startswith('predicted_rssi_')]
-        max_rssi = max(rssi_values) if rssi_values else -110
-
-        pred_as_meas.append({
-            'lat': pred['lat'],
-            'lon': pred['lon'],
-            'serving_rssi': max_rssi
-        })
-
-    add_signal_heatmap(m2, pred_as_meas)
+    add_signal_heatmap(m2, predictions)
 
     # Display maps sequentially with titles
     display(HTML("<h2 style='text-align: center;'>Signal Coverage Comparison</h2>"))

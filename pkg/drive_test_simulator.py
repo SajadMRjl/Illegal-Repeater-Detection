@@ -11,14 +11,16 @@ from . import config
 from .propagation import calculate_rssi_at_point
 
 
-def generate_measurement_grid(bounds: Optional[Dict[str, float]] = None, grid_spacing_m: Optional[float] = None) -> List[Tuple[float, float]]:
+def generate_measurement_grid(
+    bounds: Optional[Dict[str, float]] = None,
+    grid_spacing_m: Optional[float] = None,
+) -> List[Tuple[float, float]]:
     """
     Generate a grid of measurement points across the geographic area.
 
     Args:
         bounds: Dictionary with lat_min, lat_max, lon_min, lon_max
         grid_spacing_m: Spacing between measurement points in meters
-
     Returns:
         List of (lat, lon) tuples
     """
@@ -57,6 +59,22 @@ def generate_measurement_grid(bounds: Optional[Dict[str, float]] = None, grid_sp
     return measurement_points
 
 
+def simulate_result_without_repeaters(
+    bts_list: List[Dict[str, Any]],
+    measurement_points: List[Tuple[float, float]],
+    add_noise: Optional[bool] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Simulate drive test measurements without repeaters.
+    """
+    return simulate_drive_test(
+        bts_list=bts_list,
+        repeater_list=[],
+        measurement_points=measurement_points,
+        add_noise=add_noise,
+        save_to_csv=False
+    )
+
 def simulate_drive_test(
     bts_list: List[Dict[str, Any]],
     repeater_list: List[Dict[str, Any]],
@@ -83,10 +101,6 @@ def simulate_drive_test(
     Returns:
         List of measurement dictionaries
     """
-    # Generate measurement grid if not provided
-    if measurement_points is None:
-        measurement_points = generate_measurement_grid()
-
     # Get configuration
     if add_noise is None:
         add_noise = config.NOISE_CONFIG['use_noise']
@@ -195,29 +209,3 @@ def load_measurements_from_csv(filepath: Optional[str] = None) -> List[Dict[str,
 
     df = pd.read_csv(filepath)
     return df.to_dict('records')
-
-
-def get_rssi_vector_from_measurement(measurement: Dict[str, Any], bts_list: List[Dict[str, Any]]) -> Dict[str, float]:
-    """
-    Extract RSSI vector for all BTS from a measurement record.
-
-    Args:
-        measurement: Measurement dictionary
-        bts_list: List of BTS dictionaries
-
-    Returns:
-        Dictionary {bts_id: rssi_dbm}
-    """
-    rssi_vector = {}
-
-    for bts in bts_list:
-        bts_id = bts['id']
-        rssi_key = f'rssi_{bts_id}'
-
-        if rssi_key in measurement:
-            rssi_vector[bts_id] = measurement[rssi_key]
-        else:
-            # If not in measurement (shouldn't happen), use sensitivity floor
-            rssi_vector[bts_id] = config.DRIVE_TEST_CONFIG['sensitivity_floor_dbm']
-
-    return rssi_vector

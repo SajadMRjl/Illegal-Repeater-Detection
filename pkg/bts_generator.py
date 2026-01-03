@@ -118,15 +118,16 @@ def generate_repeaters(
     np.random.seed(random_seed)
 
     if not bts_list:
-        print("Error: No BTS available to assign repeaters")
+        print("Error: No BTS available for repeater placement")
         return []
 
     repeater_list = []
     max_attempts = 1000
 
     for i in range(num_repeaters):
-        # Randomly select a BTS to serve
-        serving_bts = np.random.choice(bts_list)
+        # Randomly select a BTS to serve as a location reference (placement only)
+        # Repeaters are no longer tied to a specific serving BTS
+        reference_bts = np.random.choice(bts_list)
 
         attempts = 0
         while attempts < max_attempts:
@@ -139,8 +140,8 @@ def generate_repeaters(
             lat_offset = (distance_km * np.cos(angle)) / 111
             lon_offset = (distance_km * np.sin(angle)) / 92
 
-            lat = serving_bts['lat'] + lat_offset
-            lon = serving_bts['lon'] + lon_offset
+            lat = reference_bts['lat'] + lat_offset
+            lon = reference_bts['lon'] + lon_offset
 
             # Check if within bounds
             if (bounds['lat_min'] <= lat <= bounds['lat_max'] and
@@ -149,7 +150,7 @@ def generate_repeaters(
                 # Verify actual distance
                 actual_dist = geodesic(
                     (lat, lon),
-                    (serving_bts['lat'], serving_bts['lon'])
+                    (reference_bts['lat'], reference_bts['lon'])
                 ).km
 
                 if actual_dist <= 1:
@@ -157,10 +158,7 @@ def generate_repeaters(
                         'id': f'REP_{i+1:03d}',
                         'lat': lat,
                         'lon': lon,
-                        'gain_db': gain_db,
-                        'serving_bts_id': serving_bts['id'],
-                        'serving_bts_lat': serving_bts['lat'],
-                        'serving_bts_lon': serving_bts['lon']
+                        'gain_db': gain_db
                     }
                     repeater_list.append(repeater)
                     break

@@ -3,67 +3,11 @@ Repeater detection algorithm using statistical anomaly detection.
 Implements z-score based anomaly detection and DBSCAN spatial clustering.
 """
 
-from typing import List, Dict, Any, Optional, Union, Tuple
+from typing import List, Dict, Any, Optional
 import numpy as np
 from sklearn.cluster import DBSCAN
 from . import config
-from .propagation import calculate_rssi_at_point
-
-
-def build_expected_coverage_map(bts_list: List[Dict[str, Any]], measurement_points: List[Union[Dict[str, Any], Tuple[float, float]]], add_noise: bool = False) -> List[Dict[str, Any]]:
-    """
-    Build expected coverage map without repeaters.
-
-    Calculates predicted RSSI at all measurement points assuming
-    only direct paths from BTS (no repeaters).
-
-    Args:
-        bts_list: List of BTS dictionaries
-        measurement_points: List of (lat, lon) tuples or measurement dicts
-        add_noise: Whether to add noise to predictions (default: False)
-
-    Returns:
-        List of dictionaries with predicted RSSI for each point
-    """
-    print("Building expected coverage map (without repeaters)...")
-
-    frequency_mhz = config.BTS_CONFIG['frequency_mhz']
-    rx_gain_dbi = config.DRIVE_TEST_CONFIG['rx_antenna_gain_dbi']
-    sigma_noise = config.NOISE_CONFIG['log_normal_sigma_db']
-
-    predictions = []
-
-    for point in measurement_points:
-        # Extract coordinates
-        if isinstance(point, dict):
-            lat, lon = point['lat'], point['lon']
-        else:
-            lat, lon = point
-
-        # Calculate expected RSSI (NO repeaters)
-        rssi_per_bts = calculate_rssi_at_point(
-            point_lat=lat,
-            point_lon=lon,
-            bts_list=bts_list,
-            repeater_list=[],  # CRITICAL: No repeaters for expected coverage
-            frequency_mhz=frequency_mhz,
-            rx_gain_dbi=rx_gain_dbi,
-            add_noise=add_noise,
-            sigma_noise=sigma_noise
-        )
-
-        prediction = {
-            'lat': lat,
-            'lon': lon,
-            **{f'predicted_rssi_{bts_id}': rssi
-               for bts_id, rssi in rssi_per_bts.items()}
-        }
-
-        predictions.append(prediction)
-
-    print(f"Generated predictions for {len(predictions)} points")
-    return predictions
-
+from .drive_test_simulator import simulate_result_without_repeaters
 
 def calculate_residuals(measurements: List[Dict[str, Any]], predictions: List[Dict[str, Any]], bts_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
@@ -90,7 +34,7 @@ def calculate_residuals(measurements: List[Dict[str, Any]], predictions: List[Di
         for bts in bts_list:
             bts_id = bts['id']
             actual_key = f'rssi_{bts_id}'
-            predicted_key = f'predicted_rssi_{bts_id}'
+            predicted_key = f'rssi_{bts_id}'
 
             if actual_key in meas and predicted_key in pred:
                 actual_rssi = meas[actual_key]
@@ -302,7 +246,11 @@ def localize_repeater_centroid(cluster: Dict[str, Any]) -> Optional[Dict[str, An
     }
 
 
-def detect_repeaters(measurements: List[Dict[str, Any]], bts_list: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def detect_repeaters(
+    measurements: List[Dict[str, Any]],
+    predictions: List[Dict[str, Any]],
+    bts_list: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
     """
     Main repeater detection pipeline.
 
@@ -316,20 +264,13 @@ def detect_repeaters(measurements: List[Dict[str, Any]], bts_list: List[Dict[str
     Args:
         measurements: List of measurement dictionaries
         bts_list: List of BTS dictionaries
-
+        predictions: List of prediction dictionaries
     Returns:
         List of detected repeater dictionaries
     """
     print("\n" + "="*60)
     print("REPEATER DETECTION PIPELINE")
     print("="*60)
-
-    # Step 1: Build expected coverage map
-    predictions = build_expected_coverage_map(
-        bts_list=bts_list,
-        measurement_points=measurements,
-        add_noise=False  # Don't add noise to predictions
-    )
 
     # Step 2: Calculate residuals
     residuals = calculate_residuals(measurements, predictions, bts_list)

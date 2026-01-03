@@ -36,7 +36,7 @@ DRIVE_TEST_CONFIG = {
 # Noise Model Parameters
 NOISE_CONFIG = {
     'log_normal_sigma_db': 4,  # Standard deviation for log-normal shadowing (reduced for cleaner viz)
-    'use_noise': True,  # Enable/disable noise for testing
+    'use_noise': False,  # Enable/disable noise for testing
 }
 
 # Detection Algorithm Parameters

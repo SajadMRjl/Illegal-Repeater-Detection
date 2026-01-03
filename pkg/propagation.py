@@ -129,16 +129,15 @@ def calculate_rssi_at_point(
         
         # === Indirect paths via repeaters ===
         for repeater in repeater_list:
-            if repeater.get('serving_bts_id') != bts['id']:
-                continue
+            # Repeaters repeat signals from ALL BTS stations
             
             # Check if point is within repeater coverage range (max 500m)
             dist_rep_point = geodesic((repeater['lat'], repeater['lon']), (point_lat, point_lon)).km
-            if dist_rep_point > 0.5:  # Repeater only affects points within 500m
-                continue
+
             
             # BTS -> Repeater (repeater's input antenna assumed 0 dBi)
             dist_bts_rep = geodesic((bts['lat'], bts['lon']), (repeater['lat'], repeater['lon'])).km
+
             rssi_at_repeater = calculate_received_power(
                 tx_power_dbm=bts['tx_power_dbm'],
                 distance_km=dist_bts_rep,
@@ -149,7 +148,7 @@ def calculate_rssi_at_point(
             
             # Repeater amplifies (with realistic output power limit of 20 dBm = 100mW)
             repeater_output = min(20, rssi_at_repeater + repeater['gain_db'])
-            
+
             # Repeater -> Point (using lower antenna height for repeater)
             rssi_via_repeater = calculate_received_power(
                 tx_power_dbm=repeater_output,
@@ -158,6 +157,10 @@ def calculate_rssi_at_point(
                 tx_gain_dbi=0,
                 rx_gain_dbi=rx_gain_dbi
             )
+
+            if rssi_via_repeater < RSSI_MIN:
+                continue
+
             signal_paths.append(rssi_via_repeater)
         
         # === Combine all paths ===
